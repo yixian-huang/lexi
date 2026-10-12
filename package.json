@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "dict:build": "node scripts/build-dictionary.mjs"
+    "dict:build": "python3 scripts/build-dictionary.py",
+    "dict:build:full": "LEXI_DICT_ECDICT=full python3 scripts/build-dictionary.py"
   },
   "dependencies": {
     "react": "^19.1.0",

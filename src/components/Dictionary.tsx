@@ -1,9 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
-import {
-  lookup,
-  type DictionaryEntry,
-} from "../dictionary";
+import { lookup, type DictionaryEntry } from "../dictionary";
 import { addVocab } from "../storage/vocab";
 
 type Props = {
@@ -43,7 +40,6 @@ export default function Dictionary({ onSaved }: Props) {
       }
       setResult(entry);
     } catch (err) {
-      // Asset load failures only — not "word missing"
       setError(err instanceof Error ? err.message : "Lookup failed.");
     } finally {
       setLoading(false);
@@ -89,8 +85,8 @@ export default function Dictionary({ onSaved }: Props) {
         <div>
           <h2>Dictionary</h2>
           <p className="hint">
-            Offline EN definitions + CEDICT 中文 glosses. No network required
-            for lookup.
+            Offline · Open English Wordnet + ECDICT (EN→ZH) + CC-CEDICT
+            (ZH→EN). No network for lookup.
           </p>
         </div>
       </header>
@@ -101,7 +97,7 @@ export default function Dictionary({ onSaved }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onInputKey}
-          placeholder="Try hello or 你好"
+          placeholder="Try serendipity or 你好"
           autoFocus
           aria-label="Word or phrase"
           disabled={loading}
@@ -121,14 +117,14 @@ export default function Dictionary({ onSaved }: Props) {
           )}
         </button>
       </form>
-      <p className="kbd-hint">Enter to look up · Esc clears · local data</p>
+      <p className="kbd-hint">Enter to look up · Esc clears · local packs</p>
 
       {loading && (
         <div className="state-block loading" role="status">
           <span className="spinner lg" aria-hidden />
           <div>
             <strong>Looking up…</strong>
-            <p>Searching the on-device dictionary packs.</p>
+            <p>Searching on-device Wordnet / ECDICT / CEDICT packs.</p>
           </div>
         </div>
       )}
@@ -163,8 +159,9 @@ export default function Dictionary({ onSaved }: Props) {
           </div>
           <strong>Search a word to get started</strong>
           <p>
-            High-frequency English definitions and a CEDICT subset (1–2
-            character Chinese + common glosses) ship with the app.
+            English senses from Open English Wordnet 2025, learner Chinese
+            glosses from ECDICT, and Chinese entries from CC-CEDICT — all on
+            device (~10&nbsp;MB).
           </p>
         </div>
       )}
@@ -176,9 +173,10 @@ export default function Dictionary({ onSaved }: Props) {
           </div>
           <strong>Not in the local dictionary</strong>
           <p>
-            No entry for “{query.trim()}”. Try a common word, or use{" "}
-            <em>Translate</em> for free-form sentences (online). Rebuild packs
-            with <code>npm run dict:build</code> to expand coverage.
+            No entry for “{query.trim()}”. Try another spelling, or use{" "}
+            <em>Translate</em> for free-form sentences (online). Rebuild with{" "}
+            <code>npm run dict:build</code> /{" "}
+            <code>npm run dict:build:full</code> for a larger ECDICT pack.
           </p>
         </div>
       )}
@@ -189,7 +187,7 @@ export default function Dictionary({ onSaved }: Props) {
             <div>
               <h3>{result.headword}</h3>
               {result.phonetic && (
-                <span className="phonetic">{result.phonetic}</span>
+                <span className="phonetic">/{result.phonetic}/</span>
               )}
               {result.traditional && (
                 <span className="phonetic"> · trad. {result.traditional}</span>
@@ -206,17 +204,17 @@ export default function Dictionary({ onSaved }: Props) {
           </header>
 
           {result.language === "en" && result.glossesZh.length > 0 && (
-            <p className="zh-meaning">
-              <span className="label">中文</span>
+            <div className="zh-meaning">
+              <span className="label">中文 · ECDICT</span>
               <span className="zh-text">{result.glossesZh.join(" · ")}</span>
-            </p>
+            </div>
           )}
 
           {result.language === "zh" && result.glossesEn.length > 0 && (
-            <p className="zh-meaning">
-              <span className="label">English</span>
+            <div className="zh-meaning">
+              <span className="label">English · CEDICT</span>
               <span className="zh-text">{result.glossesEn.join(" · ")}</span>
-            </p>
+            </div>
           )}
 
           {result.senses.map((sense, i) => (
@@ -227,15 +225,14 @@ export default function Dictionary({ onSaved }: Props) {
                   <li key={j}>{d}</li>
                 ))}
               </ol>
-              {sense.synonyms && sense.synonyms.length > 0 && (
-                <p className="synonyms">
-                  Synonyms: {sense.synonyms.join(", ")}
-                </p>
-              )}
             </div>
           ))}
 
-          <p className="hint small">Source: local packs (Webster subset + CC-CEDICT)</p>
+          <p className="hint small">
+            {result.language === "en"
+              ? "Senses: Open English Wordnet 2025 · Gloss: ECDICT (MIT)"
+              : "Source: CC-CEDICT (CC BY-SA 4.0)"}
+          </p>
         </article>
       )}
     </section>

@@ -11,7 +11,6 @@ async function fetchJsonGz<T>(path: string): Promise<T> {
     const text = await new Response(decompressed).text();
     return JSON.parse(text) as T;
   }
-  // Fallback: expect an uncompressed sibling (dev only)
   const plain = path.replace(/\.gz$/, "");
   const res2 = await fetch(plain);
   if (!res2.ok) {
@@ -22,9 +21,21 @@ async function fetchJsonGz<T>(path: string): Promise<T> {
   return (await res2.json()) as T;
 }
 
-export type EnDefs = Record<string, string[][]>;
-export type ZhCedict = Record<string, string[]>; // [pinyin, ...defs]
-export type EnZh = Record<string, [string, string][]>; // [zh, pinyin]
+/** OEWN: lemma → { p: phonetic, s: [[pos, def], ...] } */
+export type EnDefs = Record<
+  string,
+  { p?: string | null; s: [string, string][] }
+>;
+
+/** ECDICT: lemma → { p, t, pos, frq } */
+export type EnZh = Record<
+  string,
+  { p?: string | null; t: string; pos?: string | null; frq?: number | null }
+>;
+
+/** CEDICT: simplified → [pinyin, ...defs] */
+export type ZhCedict = Record<string, string[]>;
+
 export type TradMap = Record<string, string>;
 
 type Packs = {
@@ -49,6 +60,11 @@ export function loadDictionaryPacks(): Promise<Packs> {
     })();
   }
   return packsPromise;
+}
+
+/** Clear cached packs (tests / hot reload). */
+export function resetDictionaryPacks(): void {
+  packsPromise = null;
 }
 
 export function isChineseQuery(text: string): boolean {

@@ -6,7 +6,7 @@ Built with **Tauri 2 + React + TypeScript + Vite**. Window title: **Lexi**. GitH
 
 ## Features (MVP)
 
-1. **Dictionary** — **local-first** English definitions (Webster public-domain subset) + EN↔ZH glosses (CC-CEDICT subset). No network for word lookup.
+1. **Dictionary** — **local-first**: Open English Wordnet 2025 (EN senses) + ECDICT (EN→ZH) + full CC-CEDICT (ZH→EN). No network for word lookup.
 2. **Translate** — free-form EN↔中文 sentences via MyMemory (online). Prefer Dictionary for single words.
 3. **Practice** — spaced-repetition flashcards from words you save; Again / Hard / Good scheduling; deck in **localStorage**.
 
@@ -14,36 +14,43 @@ Network failures show a clear banner; the UI does not crash.
 
 ## Dictionary data (local-first)
 
-Word lookup uses on-device packs in `public/dict/` (gzipped JSON, ~2 MB):
+On-device packs in `public/dict/` (~**10 MB** gzipped JSON):
 
-| Pack | Contents |
-|------|----------|
-| `en-defs.json.gz` | English definitions for high-frequency lemmas |
-| `en-zh.json.gz` | English lemma → Chinese glosses |
-| `zh-cedict.json.gz` | Chinese (1–2 chars, frequency-filtered) → pinyin + defs |
-| `trad-map.json.gz` | Traditional → simplified map |
+| Pack | Source | Coverage (default build) |
+|------|--------|---------------------------|
+| `en-defs.json.gz` | [Open English Wordnet 2025](https://en-word.net/) | ~127k lemmas, senses + IPA |
+| `en-zh.json.gz` | [ECDICT](https://github.com/skywind3000/ECDICT) (MIT) | ~42k lemmas (`frq>0` or `collins≥2`) |
+| `zh-cedict.json.gz` | [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) | ~121k simplified entries (full dump) |
+| `trad-map.json.gz` | CC-CEDICT | ~77k traditional→simplified |
 
-**API:** `lookup(query) → DictionaryEntry | null` in `src/dictionary/` (ready for a future self-hosted sync; no server yet).
+**API:** `lookup(query) → DictionaryEntry | null` in `src/dictionary/` (sync-ready; no server yet).
 
-### Attribution
+### Attribution & licenses
 
-- **[CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict)** — Chinese–English dictionary, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
-- **Webster's Unabridged** (via [adambom/dictionary](https://github.com/adambom/dictionary)) — public domain English definitions (subset).
-- **[google-10000-english](https://github.com/first20hours/google-10000-english)** — frequency list used to choose the starter subset.
+- **Open English Wordnet 2025** — see [en-word.net](https://en-word.net/) / [globalwordnet/english-wordnet](https://github.com/globalwordnet/english-wordnet) (Princeton WordNet license / OEWN terms).
+- **ECDICT** — [skywind3000/ECDICT](https://github.com/skywind3000/ECDICT), **MIT**.
+- **CC-CEDICT** — [MDBG](https://www.mdbg.net/chinese/dictionary?page=cc-cedict), **CC BY-SA 4.0**.
 
-Rebuild / expand packs (downloads into `data/raw/`, not committed):
+### Rebuild packs
 
 ```bash
+# Default (app-sized ECDICT subset ~42k + full OEWN + full CEDICT)
 npm run dict:build
+
+# Larger ECDICT (all single-token rows with translations — bigger download)
+npm run dict:build:full
 ```
+
+Raw downloads land in `data/raw/` (gitignored). Tradeoff: default ECDICT omits rare lemmas without frequency/Collins tags; use `:full` locally if you need broader EN→ZH coverage.
 
 ### Online APIs (Translate only)
 
 | Use | Provider |
 |-----|----------|
-| Sentence translation | [MyMemory](https://mymemory.translated.net/) free tier (`en\|zh-CN` / `zh-CN\|en`) |
+| Sentence translation | [MyMemory](https://mymemory.translated.net/) free tier |
 
-MyMemory is rate-limited anonymously. Dictionary lookup does **not** call Free Dictionary API or MyMemory.
+Dictionary lookup does **not** use Free Dictionary API or MyMemory.
+
 
 ## Prerequisites
 
@@ -85,13 +92,13 @@ Releases are built by `.github/workflows/release.yml` on tags `v*` (e.g. `v0.1.0
 ```
 en-zh-tutor/
   src/
-    dictionary/        local lookup() + pack loader
-    api/               translate (MyMemory) + thin re-exports
-    components/        Dictionary, Translate, Practice
-    storage/           SRS vocab (localStorage)
-  public/dict/         gzipped dictionary packs (~2 MB)
-  scripts/build-dictionary.mjs
-  src-tauri/           Tauri 2 / Rust shell
+    dictionary/              lookup() + gzip pack loader
+    api/                     MyMemory translate + re-exports
+    components/
+    storage/                 SRS vocab (localStorage)
+  public/dict/               ~10 MB gzipped packs (OEWN + ECDICT + CEDICT)
+  scripts/build-dictionary.py
+  src-tauri/
 ```
 
 ## Practice scheduling (SRS)
@@ -123,7 +130,8 @@ Deck pills show **Due**, **Today**, **Learning** (new + learning), and **Mastere
 ## Known limitations
 
 - Vocabulary is per-browser/webview profile (`localStorage`), not a shared SQLite DB yet.
-- Local dictionary is a **starter subset** (not full CEDICT / not all English words).
+- Default ECDICT pack is frequency/Collins-filtered (~42k); run `dict:build:full` for broader EN→ZH.
+- OEWN + CEDICT ship in full for this release of the packs.
 - No self-hosted sync yet — data layer is sync-ready via `lookup()`.
 - MyMemory quality/limits vary; long texts may fail.
 - On some Linux boxes, `tauri build` needs webkit2gtk / rsvg packages installed first.

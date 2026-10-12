@@ -31,7 +31,6 @@ export async function lookup(query: string): Promise<DictionaryEntry | null> {
     const row = zh[key] || zh[q];
     if (!row || row.length < 2) return null;
     const [pinyin, ...defs] = row;
-    // Also try exact traditional key if mapped row missing defs on trad form stored as simp
     return {
       query: q,
       headword: key,
@@ -51,43 +50,53 @@ export async function lookup(query: string): Promise<DictionaryEntry | null> {
   }
 
   const lemma = q.toLowerCase();
-  const sensesRaw = enDefs[lemma];
-  const zhGlosses = enZh[lemma] || [];
+  const oewn = enDefs[lemma];
+  const ecdict = enZh[lemma];
 
-  if (!sensesRaw && zhGlosses.length === 0) {
+  if (!oewn && !ecdict) {
     return null;
   }
 
   const senses =
-    sensesRaw?.map((defs) => ({
-      partOfSpeech: "def",
-      definitions: defs,
-    })) ??
-    (zhGlosses.length
-      ? [
-          {
-            partOfSpeech: "gloss",
-            definitions: zhGlosses.map(
-              ([z, p]) => `${z}${p ? ` (${p})` : ""}`,
-            ),
-          },
-        ]
-      : []);
+    oewn?.s?.map(([pos, def]) => ({
+      partOfSpeech: pos,
+      definitions: [def],
+    })) ?? [];
+
+  // If OEWN missing but ECDICT has English definition-like content, surface translation as sense
+  if (senses.length === 0 && ecdict?.t) {
+    senses.push({
+      partOfSpeech: ecdict.pos || "gloss",
+      definitions: ecdict.t.split(/\n+/).map((s) => s.trim()).filter(Boolean),
+    });
+  }
+
+  const glossesZh: string[] = [];
+  if (ecdict?.t) {
+    // Prefer first line / semicolon chunks as short gloss chips
+    const flat = ecdict.t.replace(/\n+/g, "；");
+    for (const part of flat.split(/[;；]/)) {
+      const p = part.trim();
+      if (p) glossesZh.push(p);
+      if (glossesZh.length >= 6) break;
+    }
+  }
+
+  const phonetic = oewn?.p || ecdict?.p || null;
 
   return {
     query: q,
     headword: lemma,
     language: "en",
-    phonetic: null,
+    phonetic,
     senses,
-    glossesZh: zhGlosses.map(([z]) => z),
+    glossesZh,
     glossesEn: [],
     traditional: null,
     source: "local",
   };
 }
 
-/** UI helper: DictionaryEntry shaped like the old DictionaryResult. */
 export async function lookupAsResult(
   query: string,
 ): Promise<DictionaryResult | null> {

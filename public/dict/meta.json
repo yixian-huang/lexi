@@ -1,39 +1,42 @@
 {
-  "builtAt": "2026-10-12T09:14:11.434Z",
+  "builtAt": "2026-10-12T12:09:35.623138+00:00",
   "format": {
-    "en-defs.json.gz": "{ lemma: [[definition, ...], ...] }",
+    "en-defs.json.gz": "{ lemma: { p: phonetic|null, s: [[pos, definition], ...] } }  // Open English Wordnet 2025",
+    "en-zh.json.gz": "{ lemma: { p, t: translation, pos, frq } }  // ECDICT subset",
     "zh-cedict.json.gz": "{ simplified: [pinyin, def1, ...] }",
-    "en-zh.json.gz": "{ lemma: [[simplified, pinyin], ...] }",
     "trad-map.json.gz": "{ traditional: simplified }"
   },
   "sources": [
     {
+      "name": "Open English Wordnet 2025",
+      "license": "Princeton WordNet License / Open English WordNet terms",
+      "url": "https://en-word.net/",
+      "release": "https://github.com/globalwordnet/english-wordnet/releases/tag/2025-edition"
+    },
+    {
+      "name": "ECDICT",
+      "license": "MIT",
+      "url": "https://github.com/skywind3000/ECDICT",
+      "note": "Default pack: frq>0 or collins>=2. Full: LEXI_DICT_ECDICT=full"
+    },
+    {
       "name": "CC-CEDICT",
       "license": "CC BY-SA 4.0",
       "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict"
-    },
-    {
-      "name": "Webster's Unabridged (adambom/dictionary)",
-      "license": "Public domain",
-      "url": "https://github.com/adambom/dictionary"
-    },
-    {
-      "name": "google-10000-english",
-      "license": "Public frequency word list",
-      "url": "https://github.com/first20hours/google-10000-english"
     }
   ],
   "stats": {
-    "cedictParsed": 118242,
-    "zhEntries": 58090,
-    "tradMap": 31251,
-    "enZhLemmas": 3671,
-    "enDefs": 3598,
+    "enDefs": 127311,
+    "enZh": 42447,
+    "zhEntries": 121451,
+    "tradMap": 76968,
+    "ecdictMode": "subset",
     "bytes": {
-      "en-defs.json.gz": 157009,
-      "zh-cedict.json.gz": 1570333,
-      "en-zh.json.gz": 141910,
-      "trad-map.json.gz": 204126
-    }
+      "en-defs.json.gz": 4567143,
+      "en-zh.json.gz": 1483424,
+      "zh-cedict.json.gz": 3559865,
+      "trad-map.json.gz": 636188
+    },
+    "shippedMB": 10.25
   }
 }
