@@ -2,7 +2,7 @@
 
 Personal dictionary, translator, and flashcard practice desktop app.
 
-Built with **Tauri 2 + React + TypeScript + Vite**. Window title: **Lexi**. Folder/repo slug: `en-zh-tutor`.
+Built with **Tauri 2 + React + TypeScript + Vite**. Window title: **Lexi**. GitHub: [`yixian-huang/lexi`](https://github.com/yixian-huang/lexi). Local folder: `en-zh-tutor`.
 
 ## Features (MVP)
 
