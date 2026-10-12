@@ -91,7 +91,7 @@ export default function Translate({ onSaved }: Props) {
       <header className="panel-head">
         <div>
           <h2>Translate</h2>
-          <p className="hint">Bidirectional English ↔ 中文 (MyMemory, free).</p>
+          <p className="hint">Free-form sentences via MyMemory (online). Word lookup stays offline in Dictionary.</p>
         </div>
       </header>
 

@@ -33,3 +33,9 @@ src-tauri/WixTools
 # OS / misc
 Thumbs.db
 .cache
+
+# Dictionary build inputs (re-download via npm run dict:build)
+data/raw/
+# Uncompressed dict JSON if generated locally
+public/dict/*.json
+!public/dict/meta.json

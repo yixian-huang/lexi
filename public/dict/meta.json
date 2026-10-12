@@ -1,0 +1,39 @@
+{
+  "builtAt": "2026-10-12T09:14:11.434Z",
+  "format": {
+    "en-defs.json.gz": "{ lemma: [[definition, ...], ...] }",
+    "zh-cedict.json.gz": "{ simplified: [pinyin, def1, ...] }",
+    "en-zh.json.gz": "{ lemma: [[simplified, pinyin], ...] }",
+    "trad-map.json.gz": "{ traditional: simplified }"
+  },
+  "sources": [
+    {
+      "name": "CC-CEDICT",
+      "license": "CC BY-SA 4.0",
+      "url": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict"
+    },
+    {
+      "name": "Webster's Unabridged (adambom/dictionary)",
+      "license": "Public domain",
+      "url": "https://github.com/adambom/dictionary"
+    },
+    {
+      "name": "google-10000-english",
+      "license": "Public frequency word list",
+      "url": "https://github.com/first20hours/google-10000-english"
+    }
+  ],
+  "stats": {
+    "cedictParsed": 118242,
+    "zhEntries": 58090,
+    "tradMap": 31251,
+    "enZhLemmas": 3671,
+    "enDefs": 3598,
+    "bytes": {
+      "en-defs.json.gz": 157009,
+      "zh-cedict.json.gz": 1570333,
+      "en-zh.json.gz": 141910,
+      "trad-map.json.gz": 204126
+    }
+  }
+}

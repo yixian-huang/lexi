@@ -1,11 +1,9 @@
 import { useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import {
-  isChinese,
-  lookupEnglish,
-  type DictionaryResult,
-} from "../api/dictionary";
-import { translate } from "../api/translate";
+  lookup,
+  type DictionaryEntry,
+} from "../dictionary";
 import { addVocab } from "../storage/vocab";
 
 type Props = {
@@ -16,7 +14,8 @@ export default function Dictionary({ onSaved }: Props) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<DictionaryResult | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [result, setResult] = useState<DictionaryEntry | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [savedOk, setSavedOk] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -24,6 +23,7 @@ export default function Dictionary({ onSaved }: Props) {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotFound(false);
     setSavedMsg(null);
     setSavedOk(false);
     setResult(null);
@@ -31,44 +31,19 @@ export default function Dictionary({ onSaved }: Props) {
 
     try {
       const q = query.trim();
-      if (!q) throw new Error("Enter a word or phrase to look up.");
-
-      if (isChinese(q)) {
-        const tr = await translate(q, "zh-CN|en");
-        let dict: DictionaryResult | null = null;
-        try {
-          dict = await lookupEnglish(
-            tr.translated.split(/\s+/)[0] || tr.translated,
-          );
-        } catch {
-          /* translation-only fallback */
-        }
-        setResult({
-          word: q,
-          phonetic: dict?.phonetic ?? null,
-          audioUrl: dict?.audioUrl ?? null,
-          senses: dict?.senses ?? [
-            {
-              partOfSpeech: "translation",
-              definitions: [tr.translated],
-              synonyms: [],
-            },
-          ],
-          zhMeaning: q,
-          source: dict ? "dictionaryapi" : "translate-only",
-        });
-      } else {
-        const dict = await lookupEnglish(q);
-        let zh: string | null = null;
-        try {
-          const tr = await translate(dict.word, "en|zh-CN");
-          zh = tr.translated;
-        } catch {
-          zh = null;
-        }
-        setResult({ ...dict, zhMeaning: zh });
+      if (!q) {
+        setError("Enter a word or phrase to look up.");
+        return;
       }
+
+      const entry = await lookup(q);
+      if (!entry) {
+        setNotFound(true);
+        return;
+      }
+      setResult(entry);
     } catch (err) {
+      // Asset load failures only — not "word missing"
       setError(err instanceof Error ? err.message : "Lookup failed.");
     } finally {
       setLoading(false);
@@ -80,6 +55,7 @@ export default function Dictionary({ onSaved }: Props) {
       if (query) {
         setQuery("");
         setError(null);
+        setNotFound(false);
         setResult(null);
         setSavedMsg(null);
       } else {
@@ -90,18 +66,22 @@ export default function Dictionary({ onSaved }: Props) {
 
   function saveCard() {
     if (!result) return;
-    const front = result.word;
+    const front = result.headword;
     const back =
-      result.zhMeaning ||
-      result.senses[0]?.definitions[0] ||
-      "(no definition)";
+      result.language === "en"
+        ? result.glossesZh[0] ||
+          result.senses[0]?.definitions[0] ||
+          "(no gloss)"
+        : result.glossesEn[0] ||
+          result.senses[0]?.definitions[0] ||
+          "(no gloss)";
     addVocab(front, back, result.phonetic || undefined);
     setSavedMsg(`Saved “${front}” — open Practice to review.`);
     setSavedOk(true);
     onSaved?.();
   }
 
-  const showEmpty = !loading && !error && !result;
+  const showIdle = !loading && !error && !notFound && !result;
 
   return (
     <section className="panel">
@@ -109,7 +89,8 @@ export default function Dictionary({ onSaved }: Props) {
         <div>
           <h2>Dictionary</h2>
           <p className="hint">
-            English definitions + phonetic + 中文, or Chinese → English meaning.
+            Offline EN definitions + CEDICT 中文 glosses. No network required
+            for lookup.
           </p>
         </div>
       </header>
@@ -120,7 +101,7 @@ export default function Dictionary({ onSaved }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onInputKey}
-          placeholder="Try serendipity or 偶然"
+          placeholder="Try hello or 你好"
           autoFocus
           aria-label="Word or phrase"
           disabled={loading}
@@ -140,21 +121,21 @@ export default function Dictionary({ onSaved }: Props) {
           )}
         </button>
       </form>
-      <p className="kbd-hint">Enter to look up · Esc clears</p>
+      <p className="kbd-hint">Enter to look up · Esc clears · local data</p>
 
       {loading && (
         <div className="state-block loading" role="status">
           <span className="spinner lg" aria-hidden />
           <div>
             <strong>Looking up…</strong>
-            <p>Fetching dictionary and translation.</p>
+            <p>Searching the on-device dictionary packs.</p>
           </div>
         </div>
       )}
 
       {error && (
         <div className="banner error" role="alert">
-          <strong>Couldn’t look that up</strong>
+          <strong>Dictionary data error</strong>
           <p>{error}</p>
           <button
             type="button"
@@ -164,7 +145,7 @@ export default function Dictionary({ onSaved }: Props) {
               inputRef.current?.focus();
             }}
           >
-            Try again
+            Dismiss
           </button>
         </div>
       )}
@@ -175,15 +156,29 @@ export default function Dictionary({ onSaved }: Props) {
         </div>
       )}
 
-      {showEmpty && (
+      {showIdle && (
         <div className="state-block empty">
           <div className="empty-icon" aria-hidden>
             📖
           </div>
           <strong>Search a word to get started</strong>
           <p>
-            You’ll see definitions, pronunciation, and a Chinese gloss. Save
-            anything useful to Practice.
+            High-frequency English definitions and a CEDICT subset (1–2
+            character Chinese + common glosses) ship with the app.
+          </p>
+        </div>
+      )}
+
+      {notFound && !loading && (
+        <div className="state-block empty" role="status">
+          <div className="empty-icon" aria-hidden>
+            ∅
+          </div>
+          <strong>Not in the local dictionary</strong>
+          <p>
+            No entry for “{query.trim()}”. Try a common word, or use{" "}
+            <em>Translate</em> for free-form sentences (online). Rebuild packs
+            with <code>npm run dict:build</code> to expand coverage.
           </p>
         </div>
       )}
@@ -192,9 +187,12 @@ export default function Dictionary({ onSaved }: Props) {
         <article className="card result">
           <header className="result-head">
             <div>
-              <h3>{result.word}</h3>
+              <h3>{result.headword}</h3>
               {result.phonetic && (
                 <span className="phonetic">{result.phonetic}</span>
+              )}
+              {result.traditional && (
+                <span className="phonetic"> · trad. {result.traditional}</span>
               )}
             </div>
             <button
@@ -207,10 +205,17 @@ export default function Dictionary({ onSaved }: Props) {
             </button>
           </header>
 
-          {result.zhMeaning && (
+          {result.language === "en" && result.glossesZh.length > 0 && (
             <p className="zh-meaning">
               <span className="label">中文</span>
-              <span className="zh-text">{result.zhMeaning}</span>
+              <span className="zh-text">{result.glossesZh.join(" · ")}</span>
+            </p>
+          )}
+
+          {result.language === "zh" && result.glossesEn.length > 0 && (
+            <p className="zh-meaning">
+              <span className="label">English</span>
+              <span className="zh-text">{result.glossesEn.join(" · ")}</span>
             </p>
           )}
 
@@ -222,7 +227,7 @@ export default function Dictionary({ onSaved }: Props) {
                   <li key={j}>{d}</li>
                 ))}
               </ol>
-              {sense.synonyms.length > 0 && (
+              {sense.synonyms && sense.synonyms.length > 0 && (
                 <p className="synonyms">
                   Synonyms: {sense.synonyms.join(", ")}
                 </p>
@@ -230,11 +235,7 @@ export default function Dictionary({ onSaved }: Props) {
             </div>
           ))}
 
-          {result.source === "translate-only" && (
-            <p className="hint small">
-              No Free Dictionary entry — showing MyMemory translation.
-            </p>
-          )}
+          <p className="hint small">Source: local packs (Webster subset + CC-CEDICT)</p>
         </article>
       )}
     </section>

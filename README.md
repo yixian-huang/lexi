@@ -6,20 +6,44 @@ Built with **Tauri 2 + React + TypeScript + Vite**. Window title: **Lexi**. GitH
 
 ## Features (MVP)
 
-1. **Dictionary** — look up English (Free Dictionary API: definitions, phonetic) and attach a 中文 gloss via MyMemory. Chinese queries are translated to English (and dictionary-looked-up when possible).
-2. **Translate** — EN↔中文 with auto-detect or explicit direction (MyMemory).
+1. **Dictionary** — **local-first** English definitions (Webster public-domain subset) + EN↔ZH glosses (CC-CEDICT subset). No network for word lookup.
+2. **Translate** — free-form EN↔中文 sentences via MyMemory (online). Prefer Dictionary for single words.
 3. **Practice** — spaced-repetition flashcards from words you save; Again / Hard / Good scheduling; deck in **localStorage**.
 
 Network failures show a clear banner; the UI does not crash.
 
-## APIs (no paid keys)
+## Dictionary data (local-first)
 
-| Use | Provider | Endpoint |
-|-----|----------|----------|
-| English dictionary | [Free Dictionary API](https://dictionaryapi.dev/) | `https://api.dictionaryapi.dev/api/v2/entries/en/<word>` |
-| Translation | [MyMemory](https://mymemory.translated.net/) | `https://api.mymemory.translated.net/get?q=...&langpair=en\|zh-CN` (or `zh-CN\|en`) |
+Word lookup uses on-device packs in `public/dict/` (gzipped JSON, ~2 MB):
 
-MyMemory’s anonymous tier is rate-limited. If you need higher volume later, add an email key or switch providers — no keys are required for this MVP.
+| Pack | Contents |
+|------|----------|
+| `en-defs.json.gz` | English definitions for high-frequency lemmas |
+| `en-zh.json.gz` | English lemma → Chinese glosses |
+| `zh-cedict.json.gz` | Chinese (1–2 chars, frequency-filtered) → pinyin + defs |
+| `trad-map.json.gz` | Traditional → simplified map |
+
+**API:** `lookup(query) → DictionaryEntry | null` in `src/dictionary/` (ready for a future self-hosted sync; no server yet).
+
+### Attribution
+
+- **[CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict)** — Chinese–English dictionary, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **Webster's Unabridged** (via [adambom/dictionary](https://github.com/adambom/dictionary)) — public domain English definitions (subset).
+- **[google-10000-english](https://github.com/first20hours/google-10000-english)** — frequency list used to choose the starter subset.
+
+Rebuild / expand packs (downloads into `data/raw/`, not committed):
+
+```bash
+npm run dict:build
+```
+
+### Online APIs (Translate only)
+
+| Use | Provider |
+|-----|----------|
+| Sentence translation | [MyMemory](https://mymemory.translated.net/) free tier (`en\|zh-CN` / `zh-CN\|en`) |
+
+MyMemory is rate-limited anonymously. Dictionary lookup does **not** call Free Dictionary API or MyMemory.
 
 ## Prerequisites
 
@@ -60,10 +84,13 @@ Releases are built by `.github/workflows/release.yml` on tags `v*` (e.g. `v0.1.0
 
 ```
 en-zh-tutor/
-  src/                 React UI
-    api/               dictionary + translate clients
+  src/
+    dictionary/        local lookup() + pack loader
+    api/               translate (MyMemory) + thin re-exports
     components/        Dictionary, Translate, Practice
-    storage/           localStorage vocab deck
+    storage/           SRS vocab (localStorage)
+  public/dict/         gzipped dictionary packs (~2 MB)
+  scripts/build-dictionary.mjs
   src-tauri/           Tauri 2 / Rust shell
 ```
 
@@ -96,7 +123,8 @@ Deck pills show **Due**, **Today**, **Learning** (new + learning), and **Mastere
 ## Known limitations
 
 - Vocabulary is per-browser/webview profile (`localStorage`), not a shared SQLite DB yet.
-- Free Dictionary API is English-only; Chinese lookups rely on translation (+ optional EN entry).
+- Local dictionary is a **starter subset** (not full CEDICT / not all English words).
+- No self-hosted sync yet — data layer is sync-ready via `lookup()`.
 - MyMemory quality/limits vary; long texts may fail.
 - On some Linux boxes, `tauri build` needs webkit2gtk / rsvg packages installed first.
 
@@ -111,7 +139,7 @@ Deck pills show **Due**, **Today**, **Learning** (new + learning), and **Mastere
 
 - `npm install` — OK
 - `npm run build` (`tsc` + Vite) — OK
-- Free Dictionary API + MyMemory — reachable from the box
+- Local dictionary packs built; MyMemory still used for Translate only
 - `npm run tauri build` — **blocked** without Linux packages: `pkg-config`, `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, and related Tauri prerequisites
 
 On Debian/Ubuntu-like systems:
