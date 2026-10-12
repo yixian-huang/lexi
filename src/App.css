@@ -822,3 +822,132 @@ button.linkish {
     padding: 26px 28px 28px;
   }
 }
+
+/* —— SRS practice —— */
+.stat-pill.dueish {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-input));
+}
+
+.session-banner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.session-banner.mode-due {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-input));
+}
+
+.session-banner.mode-learning {
+  border-color: color-mix(in srgb, #e6b84d 40%, var(--border));
+  background: color-mix(in srgb, #e6b84d 10%, var(--bg-input));
+}
+
+.session-banner.mode-ahead {
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--border));
+  background: color-mix(in srgb, var(--ok) 10%, var(--bg-input));
+}
+
+.session-remain {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.srs-hint {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.flash-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.srs-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  background: color-mix(in srgb, var(--bg-soft) 80%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.grade-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.grade-actions button {
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  min-height: 64px;
+}
+
+.grade-key {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.grade-sub {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.btn-hard {
+  background: #c9a227;
+  color: #1a1404;
+}
+
+.btn-hard:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.practice-secondary {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.practice-secondary .btn-sm {
+  margin-top: 0;
+}
+
+.deck-srs {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .grade-actions {
+    grid-template-columns: 1fr;
+  }
+}

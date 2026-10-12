@@ -1,97 +1,159 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type Grade,
   type VocabCard,
   listVocab,
-  markKnown,
+  previewNextInterval,
   removeVocab,
   clearVocab,
+  reviewCard,
 } from "../storage/vocab";
+import {
+  buildSessionQueue,
+  classifyCard,
+  computeDeckStats,
+  formatDue,
+  formatInterval,
+} from "../storage/srs";
 
 type Props = {
   refreshKey: number;
   onDeckChange?: () => void;
 };
 
+type QueueMode = "due" | "learning" | "ahead" | "empty";
+
 export default function Practice({ refreshKey, onDeckChange }: Props) {
-  const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [sessionKnown, setSessionKnown] = useState(0);
-  const [sessionUnknown, setSessionUnknown] = useState(0);
-  const [listTick, setListTick] = useState(0);
+  const [sessionGood, setSessionGood] = useState(0);
+  const [sessionHard, setSessionHard] = useState(0);
+  const [sessionAgain, setSessionAgain] = useState(0);
+  const [deckTick, setDeckTick] = useState(0);
+  const [queueIds, setQueueIds] = useState<string[]>([]);
+  const [queueMode, setQueueMode] = useState<QueueMode>("empty");
+  const [lastHint, setLastHint] = useState<string | null>(null);
+  const [queueEpoch, setQueueEpoch] = useState(0);
 
-  const liveCards = useMemo(() => listVocab(), [refreshKey, listTick]);
-  const safeIndex =
-    liveCards.length === 0 ? 0 : Math.min(index, liveCards.length - 1);
-  const current: VocabCard | null = liveCards[safeIndex] ?? null;
+  const allCards = useMemo(
+    () => listVocab(),
+    [refreshKey, deckTick],
+  );
+  const stats = useMemo(() => computeDeckStats(allCards), [allCards]);
+  const byId = useMemo(() => {
+    const m = new Map<string, VocabCard>();
+    for (const c of allCards) m.set(c.id, c);
+    return m;
+  }, [allCards]);
 
-  function bump() {
-    setListTick((t) => t + 1);
+  const rebuildQueue = useCallback(() => {
+    const cards = listVocab();
+    const { queue, mode } = buildSessionQueue(cards);
+    setQueueIds(queue.map((c) => c.id));
+    setQueueMode(mode);
+    setFlipped(false);
+    setQueueEpoch((e) => e + 1);
+  }, []);
+
+  // Rebuild when deck changes from outside (save / clear / tab refresh)
+  useEffect(() => {
+    rebuildQueue();
+  }, [refreshKey, deckTick, rebuildQueue]);
+
+  const current: VocabCard | null =
+    queueIds.length > 0 ? (byId.get(queueIds[0]) ?? null) : null;
+
+  // Drop stale head if card was deleted
+  useEffect(() => {
+    if (queueIds.length === 0) return;
+    if (!byId.has(queueIds[0])) {
+      setQueueIds((ids) => ids.filter((id) => byId.has(id)));
+    }
+  }, [byId, queueIds]);
+
+  function notifyDeck() {
+    setDeckTick((t) => t + 1);
     onDeckChange?.();
   }
 
-  function next(delta: number) {
-    if (liveCards.length === 0) return;
+  function onGrade(grade: Grade) {
+    if (!current) return;
+    const hint = previewNextInterval(current, grade);
+    reviewCard(current.id, grade);
+    if (grade === "again") setSessionAgain((n) => n + 1);
+    else if (grade === "hard") setSessionHard((n) => n + 1);
+    else setSessionGood((n) => n + 1);
+    setLastHint(`Scheduled · next review ${hint}`);
     setFlipped(false);
-    setIndex((i) => (i + delta + liveCards.length) % liveCards.length);
+    // Bump deckTick → effect rebuilds queue from updated dues
+    notifyDeck();
   }
 
-  function onMark(known: boolean) {
-    if (!current) return;
-    markKnown(current.id, known);
-    if (known) setSessionKnown((n) => n + 1);
-    else setSessionUnknown((n) => n + 1);
+  function skip() {
+    if (queueIds.length <= 1) return;
     setFlipped(false);
-    bump();
-    if (liveCards.length > 1) {
-      setIndex((i) => (i + 1) % liveCards.length);
-    }
+    setQueueIds((ids) => [...ids.slice(1), ids[0]]);
   }
 
   function onDelete() {
     if (!current) return;
     removeVocab(current.id);
     setFlipped(false);
-    setIndex(0);
-    bump();
+    setQueueIds((ids) => ids.filter((id) => id !== current.id));
+    notifyDeck();
   }
 
   function onClear() {
     if (!confirm("Clear all saved vocabulary?")) return;
     clearVocab();
-    setIndex(0);
+    setQueueIds([]);
+    setQueueMode("empty");
     setFlipped(false);
-    setSessionKnown(0);
-    setSessionUnknown(0);
-    bump();
+    setSessionGood(0);
+    setSessionHard(0);
+    setSessionAgain(0);
+    setLastHint(null);
+    notifyDeck();
   }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (liveCards.length === 0) return;
+      if (!current) return;
 
       if (e.key === " " || e.key === "f" || e.key === "F") {
         e.preventDefault();
         setFlipped((f) => !f);
       } else if (e.key === "ArrowRight" || e.key === "j" || e.key === "J") {
         e.preventDefault();
-        next(1);
-      } else if (e.key === "ArrowLeft" || e.key === "k" || e.key === "K") {
+        skip();
+      } else if (e.key === "1" || e.key === "a" || e.key === "A") {
         e.preventDefault();
-        next(-1);
-      } else if (e.key === "1" || e.key === "n" || e.key === "N") {
+        onGrade("again");
+      } else if (e.key === "2" || e.key === "h" || e.key === "H") {
         e.preventDefault();
-        onMark(false);
-      } else if (e.key === "2" || e.key === "y" || e.key === "Y") {
+        onGrade("hard");
+      } else if (e.key === "3" || e.key === "g" || e.key === "G") {
         e.preventDefault();
-        onMark(true);
+        onGrade("good");
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional live handlers
-  }, [liveCards, current, safeIndex]);
+    // Re-bind when current card or queue head changes
+  }, [current, queueIds, queueEpoch]);
+
+  const modeBanner =
+    queueMode === "due"
+      ? "Due for review"
+      : queueMode === "learning"
+        ? "No cards due — practicing new / learning"
+        : queueMode === "ahead"
+          ? "All caught up — studying ahead"
+          : null;
+
+  const remaining = queueIds.length;
+  const showCard = current && byId.has(current.id);
 
   return (
     <section className="panel">
@@ -99,44 +161,90 @@ export default function Practice({ refreshKey, onDeckChange }: Props) {
         <div>
           <h2>Practice</h2>
           <p className="hint">
-            Flashcards from words you saved. Progress stays on this device.
+            Spaced repetition (SM-2-like). Save words from Dictionary or
+            Translate, then review due cards here.
           </p>
         </div>
       </header>
 
-      <div className="stats-row">
+      <div className="stats-row srs-stats">
+        <div className="stat-pill dueish" title="Due right now">
+          <span className="stat-label">Due</span>
+          <strong>{stats.dueNow}</strong>
+        </div>
+        <div className="stat-pill" title="Due by end of today">
+          <span className="stat-label">Today</span>
+          <strong>{stats.dueToday}</strong>
+        </div>
+        <div className="stat-pill warnish" title="New + learning">
+          <span className="stat-label">Learning</span>
+          <strong>{stats.newCount + stats.learning}</strong>
+        </div>
+        <div className="stat-pill okish" title="Interval ≥ 21 days, reps ≥ 3">
+          <span className="stat-label">Mastered</span>
+          <strong>{stats.mastered}</strong>
+        </div>
         <div className="stat-pill">
           <span className="stat-label">Deck</span>
-          <strong>{liveCards.length}</strong>
+          <strong>{stats.total}</strong>
         </div>
-        <div className="stat-pill okish">
-          <span className="stat-label">Know</span>
-          <strong>{sessionKnown}</strong>
-        </div>
-        <div className="stat-pill warnish">
-          <span className="stat-label">Don’t</span>
-          <strong>{sessionUnknown}</strong>
-        </div>
-        {liveCards.length > 0 && (
+        {allCards.length > 0 && (
           <button type="button" className="btn-ghost-danger" onClick={onClear}>
             Clear deck
           </button>
         )}
       </div>
 
-      {liveCards.length === 0 ? (
+      {allCards.length === 0 ? (
         <div className="state-block empty">
           <div className="empty-icon" aria-hidden>
             🃏
           </div>
           <strong>Your deck is empty</strong>
           <p>
-            Save words from Dictionary or Translate, then come back here to
-            flip cards and mark Know / Don’t know.
+            Save words from Dictionary or Translate, then review them with
+            Again / Hard / Good scheduling.
           </p>
         </div>
-      ) : current ? (
+      ) : !showCard ? (
+        <div className="state-block empty">
+          <div className="empty-icon" aria-hidden>
+            ✓
+          </div>
+          <strong>Session clear</strong>
+          <p>
+            Nothing left in this queue.{" "}
+            {stats.dueNow === 0
+              ? "Come back when cards are due, or save more words."
+              : "Rebuild to continue."}
+          </p>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={rebuildQueue}
+          >
+            Rebuild queue
+          </button>
+        </div>
+      ) : (
         <>
+          {modeBanner && (
+            <div className={`session-banner mode-${queueMode}`}>
+              <span>{modeBanner}</span>
+              <span className="session-remain">
+                {remaining} left
+                <span className="dot">·</span>
+                session A {sessionAgain} / H {sessionHard} / G {sessionGood}
+              </span>
+            </div>
+          )}
+
+          {lastHint && (
+            <div className="banner ok srs-hint" role="status">
+              {lastHint}
+            </div>
+          )}
+
           <div
             className={`flashcard ${flipped ? "flipped" : ""}`}
             onClick={() => setFlipped((f) => !f)}
@@ -145,7 +253,14 @@ export default function Practice({ refreshKey, onDeckChange }: Props) {
             aria-label={flipped ? "Card back" : "Card front"}
           >
             <div className="flash-face">
-              <span className="label">{flipped ? "Back" : "Front"}</span>
+              <div className="flash-meta">
+                <span className="label">{flipped ? "Back" : "Front"}</span>
+                <span className="srs-chip">
+                  {classifyCard(current)}
+                  <span className="dot">·</span>
+                  due {formatDue(current.due)}
+                </span>
+              </div>
               <p className="flash-text">
                 {flipped ? current.back : current.front}
               </p>
@@ -153,65 +268,87 @@ export default function Practice({ refreshKey, onDeckChange }: Props) {
                 <p className="phonetic">{current.note}</p>
               )}
               <p className="hint small">
-                Click · Space / F to flip · ← → navigate
+                Click · Space / F to flip · 1 Again · 2 Hard · 3 Good
               </p>
             </div>
           </div>
 
-          <div className="practice-actions">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => next(-1)}
-            >
-              ← Prev
-            </button>
+          <div className="grade-actions">
             <button
               type="button"
               className="btn-dont"
-              onClick={() => onMark(false)}
-              title="Don’t know (1 or N)"
+              onClick={() => onGrade("again")}
+              title={`Again — next in ${previewNextInterval(current, "again")}`}
             >
-              Don’t know
+              <span className="grade-key">1</span>
+              Again
+              <span className="grade-sub">
+                {previewNextInterval(current, "again")}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="btn-hard"
+              onClick={() => onGrade("hard")}
+              title={`Hard — next in ${previewNextInterval(current, "hard")}`}
+            >
+              <span className="grade-key">2</span>
+              Hard
+              <span className="grade-sub">
+                {previewNextInterval(current, "hard")}
+              </span>
             </button>
             <button
               type="button"
               className="btn-know"
-              onClick={() => onMark(true)}
-              title="Know (2 or Y)"
+              onClick={() => onGrade("good")}
+              title={`Good — next in ${previewNextInterval(current, "good")}`}
             >
-              Know
+              <span className="grade-key">3</span>
+              Good
+              <span className="grade-sub">
+                {previewNextInterval(current, "good")}
+              </span>
             </button>
+          </div>
+
+          <div className="practice-secondary">
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => next(1)}
+              className="btn-secondary btn-sm"
+              onClick={skip}
+              disabled={queueIds.length < 2}
             >
-              Next →
+              Skip →
             </button>
           </div>
 
           <p className="hint small center meta-line">
-            Card {safeIndex + 1} / {liveCards.length}
+            EF {current.ease.toFixed(1)}
             <span className="dot">·</span>
-            lifetime ✓ {current.knownCount} / ✗ {current.unknownCount}
+            interval {formatInterval(current.interval)}
+            <span className="dot">·</span>
+            reps {current.reps} / lapses {current.lapses}
             <span className="dot">·</span>
             <button type="button" className="linkish" onClick={onDelete}>
               Remove card
             </button>
           </p>
         </>
-      ) : null}
+      )}
 
-      {liveCards.length > 0 && (
+      {allCards.length > 0 && (
         <details className="deck-list">
-          <summary>All saved words ({liveCards.length})</summary>
+          <summary>All saved words ({allCards.length})</summary>
           <ul>
-            {liveCards.map((c) => (
+            {allCards.map((c) => (
               <li key={c.id}>
                 <strong>{c.front}</strong>
                 <span className="deck-sep">—</span>
                 {c.back}
+                <span className="deck-srs">
+                  {classifyCard(c)} · {formatDue(c.due)}
+                </span>
               </li>
             ))}
           </ul>

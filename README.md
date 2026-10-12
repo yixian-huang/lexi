@@ -8,7 +8,7 @@ Built with **Tauri 2 + React + TypeScript + Vite**. Window title: **Lexi**. Fold
 
 1. **Dictionary** — look up English (Free Dictionary API: definitions, phonetic) and attach a 中文 gloss via MyMemory. Chinese queries are translated to English (and dictionary-looked-up when possible).
 2. **Translate** — EN↔中文 with auto-detect or explicit direction (MyMemory).
-3. **Practice** — flashcards from words you save; flip, mark know / don’t know; deck stored in **localStorage** (no SQLite in this MVP).
+3. **Practice** — spaced-repetition flashcards from words you save; Again / Hard / Good scheduling; deck in **localStorage**.
 
 Network failures show a clear banner; the UI does not crash.
 
@@ -57,6 +57,32 @@ en-zh-tutor/
   src-tauri/           Tauri 2 / Rust shell
 ```
 
+## Practice scheduling (SRS)
+
+Lexi uses a **minimal SM-2-like** scheduler stored on each card in `localStorage`:
+
+| Field | Meaning |
+|-------|---------|
+| `interval` | Days until the next review |
+| `ease` | Ease factor (starts at 2.5, floor 1.3) |
+| `due` | Next review time (epoch ms) |
+| `reps` | Successful review count |
+| `lapses` | Times graded **Again** |
+
+**Grades**
+
+- **Again** (1) — lapse; reset reps; ease −0.2; due again in ~10 minutes
+- **Hard** (2) — ease −0.15; shorter growth (first hard ≈ 12h, then ×1.2)
+- **Good** (3) — classic steps: 1 day → 3 days → `interval × ease`
+
+**Session queue**
+
+1. Cards with `due ≤ now` first (oldest due first)
+2. If none due → new / learning cards
+3. If still none → “study ahead” (soonest upcoming)
+
+Deck pills show **Due**, **Today**, **Learning** (new + learning), and **Mastered** (interval ≥ 21 days and reps ≥ 3). Existing cards without SRS fields are migrated on load (due immediately).
+
 ## Known limitations
 
 - Vocabulary is per-browser/webview profile (`localStorage`), not a shared SQLite DB yet.
@@ -68,7 +94,7 @@ en-zh-tutor/
 
 - Open the folder in Cursor / your editor and run `npm run tauri dev` on your machine.
 - Optionally create a private GitHub repo and push when ready.
-- Later: SQLite via Tauri plugin, spaced repetition, audio pronunciation, offline word packs.
+- Later: SQLite via Tauri plugin, audio pronunciation, offline word packs, richer SRS tunables.
 
 
 ## Verified on scaffold host
