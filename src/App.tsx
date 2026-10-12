@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import Dictionary from "./components/Dictionary";
 import Translate from "./components/Translate";
 import Practice from "./components/Practice";
+import UpdaterBanner from "./components/UpdaterBanner";
 import "./App.css";
 
 type Tab = "dictionary" | "translate" | "practice";
@@ -89,6 +90,8 @@ function App() {
           ))}
         </nav>
       </header>
+
+      <UpdaterBanner checkOnLaunch />
 
       <main className="content" role="tabpanel">
         {tab === "dictionary" && <Dictionary onSaved={bumpVocab} />}

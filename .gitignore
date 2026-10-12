@@ -39,3 +39,8 @@ data/raw/
 # Uncompressed dict JSON if generated locally
 public/dict/*.json
 !public/dict/meta.json
+
+# Updater signing private key (NEVER commit)
+.keys/**
+!.keys/
+!.keys/README.md

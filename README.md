@@ -101,6 +101,41 @@ en-zh-tutor/
   src-tauri/
 ```
 
+## Auto-update (Tauri updater)
+
+Lexi checks GitHub Releases on launch (and via **Check for updates** in the header) using `tauri-plugin-updater`.
+
+- Endpoint: `https://github.com/yixian-huang/lexi/releases/latest/download/latest.json`
+- Artifacts are **minisign-signed** (`createUpdaterArtifacts` + CI `TAURI_SIGNING_PRIVATE_KEY`)
+- After download, the app relaunches via `tauri-plugin-process`
+
+### Private repo limitation
+
+Anonymous clients **cannot** download assets from a **private** GitHub repo. Until Releases (or the whole repo) are publicly fetchable, in-app update checks will fail. Options:
+
+1. **Recommended for seamless updates:** make the repo or at least release assets public, **or**
+2. Host `latest.json` + `.app.tar.gz` / `.sig` on any public HTTPS URL and change `plugins.updater.endpoints` in `tauri.conf.json`, **or**
+3. (Not recommended) ship a GitHub token inside the app.
+
+This repo stays private unless you change visibility yourself — the updater is wired for when the feed is reachable.
+
+### First signed release (Yixian)
+
+Keys were generated under `.keys/` on the build machine (gitignored). To publish signed updates:
+
+1. Ensure you have the private key file (`.keys/lexi.key`) or regenerate:
+   ```bash
+   npm run tauri signer generate -- -w .keys/lexi.key --ci
+   ```
+   Then copy the **public** key into `src-tauri/tauri.conf.json` → `plugins.updater.pubkey` (already set for the current keypair).
+2. In GitHub → **Settings → Secrets and variables → Actions**, add:
+   - `TAURI_SIGNING_PRIVATE_KEY` = **contents** of `.keys/lexi.key` (entire file)
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = password if you set one (omit/empty if none)
+3. Tag a new version (e.g. `v0.4.0`) so `release.yml` builds, signs, and uploads `.sig` + `latest.json`.
+4. Install that build once; later tags should prompt in-app updates when the release feed is publicly readable.
+
+**Do not commit** the private key. Losing it breaks the update chain for existing installs.
+
 ## Practice scheduling (SRS)
 
 Lexi uses a **minimal SM-2-like** scheduler stored on each card in `localStorage`:
