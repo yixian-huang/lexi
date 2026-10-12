@@ -46,6 +46,16 @@ npm run build
 npm run tauri build
 ```
 
+## Download (macOS)
+
+GitHub Releases publish **unsigned** macOS builds (Apple Silicon and Intel):
+
+1. Open [Releases](https://github.com/yixian-huang/lexi/releases) and download the `.dmg` for your Mac (`aarch64` = Apple Silicon / M-series, `x86_64` = Intel).
+2. Open the DMG and drag **Lexi** into Applications.
+3. **Gatekeeper (unsigned app):** the first launch may say the app “can’t be opened.” Use **Right-click (or Control-click) → Open**, then confirm **Open**. Or go to **System Settings → Privacy & Security** and click **Open Anyway**.
+
+Releases are built by `.github/workflows/release.yml` on tags `v*` (e.g. `v0.1.0`) or via **Actions → Release → Run workflow**.
+
 ## Project layout
 
 ```

@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            rust_target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+          - platform: macos-latest
+            rust_target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: ${{ matrix.rust_target }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload macOS release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: "Lexi v__VERSION__"
+          releaseBody: |
+            Personal EN↔ZH dictionary, translate, and SRS practice.
+
+            **macOS (unsigned):** download the `.dmg` for your chip (Apple Silicon = `aarch64`, Intel = `x86_64`), open it, drag Lexi to Applications. If Gatekeeper blocks it: Right-click → Open, or System Settings → Privacy & Security → Open Anyway.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
